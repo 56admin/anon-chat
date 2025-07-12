@@ -16,8 +16,15 @@ function App() {
   const [chat, setChat] = useState([])       // История сообщений
   const [mySocketId, setMySocketId] = useState("") //Знаем свой id в чате
   const [isRoomReady, setIsRoomReady] = useState(false) // можно ли писать сообщения
-
-
+  const [inChat, setInChat] = useState(false) //При “joinRoom” и “roomReady” ставить setInChat(true); при завершении чата — setInChat(false)
+  const handleEndChat = () => {
+    if (connectedRoom) {
+      socket.emit("endChat", { roomId: connectedRoom })
+    }
+    setConnectedRoom(null)
+    setChat([])
+    setIsRoomReady(false)
+  }
 
   // 🔌 При подключении к комнате или получении сообщений
   useEffect(() => {
@@ -42,11 +49,20 @@ function App() {
       setChat(prev => [...prev, { text, from }])
     })
 
+    socket.on("chatEnded", () => {
+      setConnectedRoom(null)
+      setChat([])
+      setIsRoomReady(false)
+      setInChat(false)
+      alert("Собеседник завершил чат")
+    })
+
     return () => {
       socket.off("connect")
       socket.off("joinRoom")
       socket.off("message")
       socket.off("roomReady")
+      socket.off("chatEnded")
     }
   }, [])
 
@@ -112,13 +128,20 @@ function App() {
         <button onClick={handleSearch}>🔍 Найти собеседника</button>
       </div>
 
- {connectedRoom && (
+      {connectedRoom && (
   <div style={{ marginTop: "20px" }}>
     ✅ Вы подключены к комнате: <strong>{connectedRoom}</strong>
     {!isRoomReady && <div style={{ color: "orange", marginTop: 10 }}>Ждём собеседника…</div>}
 
     {isRoomReady && (
       <>
+        <button
+          onClick={handleEndChat}
+          style={{ marginTop: 16, background: "red", color: "white" }}
+        >
+          Завершить чат
+        </button>
+
         <div style={{ marginTop: "20px" }}>
           <input
             type="text"

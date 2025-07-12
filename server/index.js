@@ -81,6 +81,15 @@ io.on('connection', (socket) => {
     await redis.del(`status:${socket.id}`)
     // Здесь позже: очистка очереди и активных сессий
   })
+
+  socket.on('endChat', async ({ roomId }) => {
+    // Опционально: удалить инфу о сессии из Redis
+    await redis.del(`session:${roomId}`)
+    // Уведомить второго участника (если он ещё в комнате)
+    socket.to(roomId).emit("chatEnded")
+    // Вывести из комнаты
+    socket.leave(roomId)
+  })
 })
 
 // Запуск сервера
