@@ -1,0 +1,38 @@
+version: '3.9'
+
+services:
+  backend:
+    build: ./server       # Указываем папку, где лежит Dockerfile и исходники backend'а
+    ports:
+      - "3001:3001"       # Пробрасываем порт: хост:контейнер
+    volumes:
+      - ./server:/app     # Монтируем локальную папку в контейнер, чтобы можно было редактировать код без пересборки
+      - /app/node_modules # Исключаем node_modules из volume, чтобы не затереть зависимости в контейнере (важно для Windows!)
+    depends_on:
+      - redis             # Запускаем Redis перед backend
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  redis:
+    image: redis:7        # Используем официальный образ Redis (можно 7+)
+    ports:
+      - "6379:6379"       # Пробрасываем порт Redis (опционально — для дебага)
+    volumes:
+      - redis_data:/data  # Персистентное хранилище данных Redis
+  
+  client:
+    build:
+      context: ./client
+    ports:
+      - "3000:3000"
+    #volumes:
+    #  - ./client:/app
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  redis_data:              # Объявляем volume Redis (данные будут сохраняться между перезапусками)
