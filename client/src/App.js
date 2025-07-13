@@ -39,10 +39,9 @@ function App() {
     setChat([]);
     setIsRoomReady(false);
     setIsSearching(true);
-    handleSearch();
-    setIsSearching(false); // Чтобы показывалась форма поиска!
-  }; //Поиск новой комнаты через "Искать нового нового собеседника"
-
+    handleSearch(); // Чтобы показывалась форма поиска!
+  }; 
+  
   const [isSearching, setIsSearching] = useState(false)
 
 
