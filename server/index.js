@@ -39,7 +39,7 @@ io.on('connection', (socket) => {
     console.log(`📥 JOIN от ${socket.id}:`, payload)
 
     try {
-      await handleJoin(socket, redis, payload)
+      await handleJoin(socket, io, redis, payload)
     } catch (err) {
       console.error(`❌ Ошибка в handleJoin:`, err)
       socket.emit('error', { message: 'Internal server error' })
