@@ -22,7 +22,7 @@ function App() {
   const [gender, setGender] = useState("m")
   const [ageGroup, setAgeGroup] = useState("18-25")
   const [seekingGender, setSeekingGender] = useState("f")
-  const [seekingAgeGroup, setSeekingAgeGroup] = useState("18-25")
+  const [seekingAgeGroups, setSeekingAgeGroups] = useState(["18-25"]);
 
   // 🔁 Комната и сообщения
   const [connectedRoom, setConnectedRoom] = useState(null)
@@ -41,7 +41,7 @@ function App() {
     setIsSearching(true);
     handleSearch(); // Чтобы показывалась форма поиска!
   }; 
-  
+
   const [isSearching, setIsSearching] = useState(false)
 
 
@@ -90,7 +90,7 @@ function App() {
       gender,
       ageGroup,
       seekingGender,
-      seekingAgeGroup,
+      seekingAgeGroups, // массив выбранных возрастов
     })
   }
 
@@ -112,148 +112,178 @@ function App() {
 
   return (
     <div style={{
-      maxWidth: 420,
-      margin: "50px auto",
-      padding: 24,
-      borderRadius: 12,
-      boxShadow: "0 2px 16px #0001",
-      fontFamily: "Inter, Arial, sans-serif",
-      background: "#f9f9ff"
+      maxWidth: 420, margin: "50px auto", padding: 24,
+      borderRadius: 12, boxShadow: "0 2px 16px #0001",
+      fontFamily: "Inter, Arial, sans-serif", background: "#f9f9ff"
     }}>
-      <h2 style={{textAlign: "center"}}>Анонимный чат</h2>
-
-      {/* БЛОК: Поиск собеседника */}
-    {isSearching && !connectedRoom && (
-      <div style={{textAlign: "center", padding: 32}}>
-        <div style={{fontSize: 28}}>🔍</div>
-        <div style={{marginTop: 18, fontSize: 20, color: "#333"}}>
-          Ищем собеседника...
+      <h2 style={{textAlign: "center", letterSpacing: 1, color: "#222", marginBottom: 24}}>
+        Анонимный чат
+      </h2>
+  
+      {/* Поиск/ожидание */}
+      {isSearching && !connectedRoom && (
+        <div style={{
+          textAlign: "center", padding: 36,
+          background: "#fff", borderRadius: 10, boxShadow: "0 1px 4px #0001"
+        }}>
+          <div style={{fontSize: 32}}>🔍</div>
+          <div style={{marginTop: 14, fontSize: 18, color: "#333"}}>Ищем собеседника…</div>
+          <div style={{marginTop: 8, fontSize: 13, color: "#999"}}>Обычно это занимает несколько секунд</div>
         </div>
-        <div style={{marginTop: 8, fontSize: 14, color: "#999"}}>
-          Обычно это занимает несколько секунд
-        </div>
-      </div>
-    )}
-
-      {/* БЛОК: Форма выбора параметров */}
+      )}
+  
+      {/* Форма параметров поиска */}
       {!isSearching && !connectedRoom && (
-        <form onSubmit={e => { e.preventDefault(); handleSearch() }}>
-          <div style={{marginBottom: 12}}>
-            <label>Ваш пол: </label>
-            <select value={gender} onChange={e => setGender(e.target.value)}>
+        <form onSubmit={e => { e.preventDefault(); handleSearch() }} style={{background: "#fff", borderRadius: 10, padding: 18, boxShadow: "0 1px 4px #0001"}}>
+          <FormRow label="Ваш пол:">
+            <select value={gender} onChange={e => setGender(e.target.value)} style={inputStyle}>
               <option value="m">Мужской</option>
               <option value="f">Женский</option>
             </select>
-          </div>
-          <div style={{marginBottom: 12}}>
-            <label>Ваш возраст: </label>
-            <select value={ageGroup} onChange={e => setAgeGroup(e.target.value)}>
-              <option value="18">18</option>
-              <option value="19-25">19–25</option>
+          </FormRow>
+          <FormRow label="Ваш возраст:">
+            <select value={ageGroup} onChange={e => setAgeGroup(e.target.value)} style={inputStyle}>
+              <option value="18+">18+</option>
+              <option value="18-25">18–25</option>
               <option value="25-35">25–35</option>
               <option value="35+">35+</option>
             </select>
-          </div>
-          <div style={{marginBottom: 12}}>
-            <label>Ищу пол: </label>
-            <select value={seekingGender} onChange={e => setSeekingGender(e.target.value)}>
+          </FormRow>
+          <FormRow label="Ищу пол:">
+            <select value={seekingGender} onChange={e => setSeekingGender(e.target.value)} style={inputStyle}>
               <option value="m">Мужской</option>
               <option value="f">Женский</option>
             </select>
-          </div>
-          <div style={{marginBottom: 24}}>
-            <label>Ищу возраст: </label>
-            <select value={seekingAgeGroup} onChange={e => setSeekingAgeGroup(e.target.value)}>
-              <option value="18">18</option>
-              <option value="19-25">19–25</option>
-              <option value="25-35">25–35</option>
-              <option value="35+">35+</option>
-            </select>
-          </div>
-          <button style={{
-            width: "100%", padding: 10, fontSize: 18, borderRadius: 6,
-            background: "#654af5", color: "white", border: "none"
-          }}>
+          </FormRow>
+          <FormRow label="Ищу возраст:">
+            <div style={{display: "flex", flexWrap: "wrap", gap: "8px 18px"}}>
+              {["18+", "18-25", "25-35", "35+"].map(val => (
+                <label key={val} style={{
+                  userSelect: "none",
+                  fontSize: 15,
+                  display: "flex", alignItems: "center", gap: 6,
+                  marginBottom: 3
+                }}>
+                  <input
+                    type="checkbox"
+                    value={val}
+                    checked={seekingAgeGroups.includes(val)}
+                    onChange={e => {
+                      if (e.target.checked) setSeekingAgeGroups(arr => [...arr, val])
+                      else setSeekingAgeGroups(arr => arr.filter(v => v !== val))
+                    }}
+                    style={{marginRight: 3}}
+                  />
+                  {val}
+                </label>
+              ))}
+            </div>
+          </FormRow>
+          <button
+            style={buttonStyle}
+            disabled={!seekingAgeGroups.length}
+          >
             🔍 Найти собеседника
           </button>
         </form>
       )}
-
-{connectedRoom && (
-  <div>
-    {chatEnded ? (
-      // ====== МЕНЮ ПОСЛЕ ЗАВЕРШЕНИЯ ЧАТА ======
-      <div style={{textAlign: "center", margin: "30px 0"}}>
-        <h3>Чат завершён!</h3>
-        <button onClick={handleFindNewPartner}>🔄 Найти нового собеседника</button>
-        <button onClick={() => saveChatAsHtml(chat, mySocketId)}>💾 Сохранить чат</button>
-        <button onClick={() => { 
-          setChatEnded(false);
-          setConnectedRoom(null); 
-          setChat([]);
-         }}>⚙️ Изменить параметры поиска</button>
-      </div>
-    ) : (
-      // ====== СТАНДАРТНЫЙ ЧАТ ======
-      <>
-        <div style={{marginBottom: 12, textAlign: "center"}}>
-          <span style={{color: "#222"}}>
-            ✅ Вы подключены к комнате: <strong>{connectedRoom}</strong>
-          </span>
+  
+      {/* Чат или меню после чата */}
+      {connectedRoom && (
+        <div>
+          {chatEnded ? (
+            <div style={{textAlign: "center", margin: "30px 0"}}>
+              <h3>Чат завершён!</h3>
+              <button style={buttonStyle} onClick={handleFindNewPartner}>🔄 Найти нового собеседника</button>
+              <button style={buttonStyle} onClick={() => saveChatAsHtml(chat, mySocketId)}>💾 Сохранить чат</button>
+              <button style={buttonStyle} onClick={() => {
+                setChatEnded(false); setConnectedRoom(null); setChat([]);
+              }}>⚙️ Изменить параметры поиска</button>
+            </div>
+          ) : (
+            <>
+              <div style={{marginBottom: 12, textAlign: "center"}}>
+                <span style={{color: "#222"}}>
+                  ✅ Вы подключены к комнате: <strong>{connectedRoom}</strong>
+                </span>
+              </div>
+              {!isRoomReady && <div style={{ color: "#ff9600", textAlign: "center" }}>Ждём собеседника…</div>}
+  
+              {isRoomReady && (
+                <>
+                  <button style={{...buttonStyle, background: "#f44"}} onClick={handleEndChat}>
+                    Завершить чат
+                  </button>
+                  <div style={{display: "flex", marginBottom: 16}}>
+                    <input
+                      type="text"
+                      value={message}
+                      onChange={e => setMessage(e.target.value)}
+                      placeholder="Введите сообщение"
+                      style={{ flex: 1, padding: "8px 6px", borderRadius: 5, border: "1px solid #ccc" }}
+                      onKeyDown={e => { if (e.key === "Enter") handleSendMessage() }}
+                    />
+                    <button style={{...buttonStyle, marginLeft: 8}} onClick={handleSendMessage}>
+                      ➤
+                    </button>
+                  </div>
+                  <div style={{
+                    background: "#fff", borderRadius: 8, minHeight: 100, padding: 10,
+                    boxShadow: "0 1px 4px #0001", marginBottom: 8, maxHeight: 220, overflowY: "auto"
+                  }}>
+                    {chat.map((msg, i) => (
+                      <div key={i} style={{ marginBottom: 6 }}>
+                        <strong style={{color: msg.from === mySocketId ? "#654af5" : "#444"}}>
+                          {msg.from === mySocketId ? "Вы" : "Собеседник"}:
+                        </strong>{" "}
+                        <span>{msg.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
-        {!isRoomReady && <div style={{ color: "#ff9600", textAlign: "center" }}>Ждём собеседника…</div>}
-
-        {isRoomReady && (
-          <>
-            <button
-              onClick={handleEndChat}
-              style={{
-                background: "#f44", color: "#fff", border: "none",
-                borderRadius: 5, padding: "8px 16px", margin: "0 auto 16px", display: "block"
-              }}
-            >
-              Завершить чат
-            </button>
-            <div style={{display: "flex", marginBottom: 16}}>
-              <input
-                type="text"
-                value={message}
-                onChange={e => setMessage(e.target.value)}
-                placeholder="Введите сообщение"
-                style={{ flex: 1, padding: "8px 6px", borderRadius: 5, border: "1px solid #ccc" }}
-                onKeyDown={e => { if (e.key === "Enter") handleSendMessage() }}
-              />
-              <button
-                onClick={handleSendMessage}
-                style={{
-                  marginLeft: 8, background: "#654af5", color: "#fff",
-                  border: "none", borderRadius: 5, padding: "8px 12px"
-                }}
-              >
-                ➤
-              </button>
-            </div>
-            <div style={{
-              background: "#fff", borderRadius: 8, minHeight: 100, padding: 10,
-              boxShadow: "0 1px 4px #0001", marginBottom: 8, maxHeight: 220, overflowY: "auto"
-            }}>
-              {chat.map((msg, i) => (
-                <div key={i} style={{ marginBottom: 6 }}>
-                  <strong style={{color: msg.from === mySocketId ? "#654af5" : "#444"}}>
-                    {msg.from === mySocketId ? "Вы" : "Собеседник"}:
-                  </strong>{" "}
-                  <span>{msg.text}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </>
-    )}
-  </div>
-)}
+      )}
+    </div>
+  )
+                    }
+// ==========================
+// Helper-компоненты и стили:
+function FormRow({ label, children }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={{
+        display: "block",
+        marginBottom: 4,
+        color: "#444",
+        fontWeight: 500
+      }}>{label}</label>
+      {children}
     </div>
   )
 }
 
+const buttonStyle = {
+  width: "100%",
+  padding: 10,
+  fontSize: 16,
+  borderRadius: 6,
+  background: "#654af5",
+  color: "white",
+  border: "none",
+  marginBottom: 10,
+  marginTop: 5,
+  cursor: "pointer"
+};
+const inputStyle = {
+  width: "100%",
+  padding: 7,
+  fontSize: 16,
+  borderRadius: 5,
+  border: "1px solid #bbb"
+};
+
+// --- Только после всех объявлений!
 export default App
