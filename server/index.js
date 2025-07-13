@@ -83,12 +83,22 @@ io.on('connection', (socket) => {
   })
 
   socket.on('endChat', async ({ roomId }) => {
-    // Опционально: удалить инфу о сессии из Redis
+    if (!roomId) return
+
+    // Получаем участников комнаты
+    const session = await redis.hgetall(`session:${roomId}`)
+    if (session && (session.userA || session.userB)) {
+      // Уведомляем обоих, что чат завершён
+      if (session.userA) io.to(session.userA).emit('chatEnded')
+      if (session.userB) io.to(session.userB).emit('chatEnded')
+    }
+
+    // Очищаем комнату и сессию
     await redis.del(`session:${roomId}`)
-    // Уведомить второго участника (если он ещё в комнате)
-    socket.to(roomId).emit("chatEnded")
-    // Вывести из комнаты
+    // (дополнительно можешь очищать статус/очереди, если нужно)
     socket.leave(roomId)
+    // (все остальные действия — по желанию)
+    console.log(`Чат ${roomId} завершён`)
   })
 })
 
