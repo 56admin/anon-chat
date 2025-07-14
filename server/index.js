@@ -85,6 +85,14 @@ io.on('connection', (socket) => {
   socket.on('endChat', async ({ roomId }) => {
     if (!roomId) return
 
+      // Снимаем все статусы: пользователь больше не ищет и не в чате
+  await redis.set(
+    `status:${socket.id}`,
+    'inactive',
+    'EX',
+    config.REDIS_STATUS_TTL_SECONDS // Например, 60 секунд
+  );
+
     // Получаем участников комнаты
     const session = await redis.hgetall(`session:${roomId}`)
     if (session && (session.userA || session.userB)) {

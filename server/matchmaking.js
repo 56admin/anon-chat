@@ -5,6 +5,14 @@ import { v4 as uuidv4 } from 'uuid'
  * Алгоритм поиска собеседника с поддержкой мультивыбора возраста.
  */
 export async function handleJoin(socket, io, redis, payload) {
+    // Ставим флаг активности (что клиент начал поиск — значит готов к матчмейкингу)
+    await redis.set(
+      `status:${socket.id}`,
+      'active',
+      'EX',
+      config.REDIS_STATUS_TTL_SECONDS // обычно 60-300 секунд, как в config.js
+    );
+  
   const {
     ageGroup,        // твой возраст (например: '18-25')
     gender,          // твой пол (например: 'm')
@@ -21,16 +29,24 @@ export async function handleJoin(socket, io, redis, payload) {
     while ((candidateRaw = await redis.rpop(queueKey))) {
       const candidate = JSON.parse(candidateRaw);
 
-      // [A] Не допускаем self-join
+      // [1.1] Не допускаем self-join
       if (candidate.socketId === socket.id) continue;
 
-      // [B] Проверяем, что кандидат онлайн
+      // [1.2] Проверяем, что кандидат онлайн
       if (!io.sockets.sockets.has(candidate.socketId)) {
         console.log(`❌ Кандидат ${candidate.socketId} оффлайн, ищем дальше...`);
         continue;
       }
 
-      // [C] Проверяем, что МЫ попадаем в интересы кандидата (встречный поиск)
+      //[1.3]  Проверяем статус активности кандидата
+      const candidateStatus = await redis.get(`status:${candidate.socketId}`);
+    if (candidateStatus !== 'active') {
+      // если кандидат не активен, пропускаем его
+      await redis.lpush(queueKey, candidateRaw); // возвращаем обратно в очередь
+      continue; // идём дальше
+    }
+
+      // [1.4] Проверяем, что МЫ попадаем в интересы кандидата (встречный поиск)
       // То есть мы должны быть в числе тех, кого ищет кандидат:
       //  - мой пол ∈ candidate.seekingGender
       //  - мой возраст ∈ candidate.seekingAgeGroups
@@ -41,7 +57,7 @@ export async function handleJoin(socket, io, redis, payload) {
         candidate.seekingGender === gender &&
         candidateSeekingAges.includes(ageGroup)
       ) {
-        // Найден идеальный матч!
+        // Найден матч!
 
         const roomId = uuidv4();
 
@@ -66,7 +82,7 @@ export async function handleJoin(socket, io, redis, payload) {
         return;
       }
 
-      // [D] Если не подошёл — возвращаем обратно в очередь
+      // [1.5] Если не подошёл — возвращаем обратно в очередь
       await redis.lpush(queueKey, candidateRaw);
     }
   }
