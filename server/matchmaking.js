@@ -28,6 +28,7 @@ export async function handleJoin(socket, io, redis, payload) {
     // Проверяем всех в этой очереди (ищем того, кто онлайн и подходит нам)
     while ((candidateRaw = await redis.rpop(queueKey))) {
       const candidate = JSON.parse(candidateRaw);
+      console.log("DEBUG candidate", candidate);
 
       // [1.1] Не допускаем self-join
       if (candidate.socketId === socket.id) continue;
@@ -95,7 +96,7 @@ export async function handleJoin(socket, io, redis, payload) {
       ageGroup,
       gender,
       seekingGender,
-      seekingAgeGroups,
+      seekingAgeGroups: Array.isArray(seekingAgeGroups) ? seekingAgeGroups : [seekingAgeGroups], // Всегда массив!
       joined: Date.now()
     });
     await redis.lpush(myQueueKey, entry);
