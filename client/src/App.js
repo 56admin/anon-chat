@@ -17,6 +17,16 @@ function saveChatAsHtml(chat, mySocketId) {
   link.click()
 }
 
+function getClientId() {
+  let id = localStorage.getItem('anonClientId');
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem('anonClientId', id);
+  }
+  return id;
+}
+const clientId = getClientId();
+
 function App() {
   // 🧠 Выбор пользователя
   const [gender, setGender] = useState("m")
@@ -90,7 +100,8 @@ function App() {
       gender,
       ageGroup,
       seekingGender,
-      seekingAgeGroups, // массив выбранных возрастов
+      seekingAgeGroups,
+      clientId, // массив выбранных возрастов
     })
   }
 
