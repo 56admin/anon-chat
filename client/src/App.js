@@ -104,7 +104,6 @@ function App() {
       ageGroup,
       seekingGender,
       seekingAgeGroups,
-      clientId, // массив выбранных возрастов
     })
   }
 

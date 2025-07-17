@@ -12,6 +12,8 @@ import { v4 as uuidv4 } from "uuid";
 
 import { ignoreUser } from './redisIgnore.js';
 
+const app = express()
+
 // Подключаем парсер cookie (Express middleware для работы с cookie)
 app.use(cookieParser());
 
@@ -46,7 +48,6 @@ const redis = new Redis({
 })
 
 // Express-сервер + WebSocket сервер поверх него
-const app = express()
 const server = http.createServer(app)
 const io = new Server(server, {
   cors: {
@@ -55,10 +56,6 @@ const io = new Server(server, {
   }
 })
 
-// Маршрут-заглушка
-app.get('/', (req, res) => {
-  res.send('Backend is alive!')
-})
 
 const joinedCount = {};
 
@@ -66,6 +63,7 @@ const joinedCount = {};
 io.on('connection', (socket) => {
   console.log(`🔌 Клиент подключился: ${socket.id}`)
   socket.data.anonClientId = socket.handshake.query.anonClientId;
+  console.log(`anonClientId для ${socket.id}: ${socket.data.anonClientId}`);
 
 
   // Клиент отправляет 'join' — хочет искать собеседника
