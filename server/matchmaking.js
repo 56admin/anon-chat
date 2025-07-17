@@ -1,6 +1,9 @@
 import { config } from './config.js'
 import { v4 as uuidv4 } from 'uuid'
 
+import { isIgnored } from './redisIgnore.js';
+
+
 export async function handleJoin(socket, io, redis, payload) {
   const {
     ageGroup,        // твой возраст (например: '18-25')
@@ -23,6 +26,7 @@ export async function handleJoin(socket, io, redis, payload) {
   // --- 2. Добавляем себя ТОЛЬКО в свою очередь
   const myEntry = JSON.stringify({
     socketId: socket.id,
+    anonClientId: socket.data.anonClientId,
     ageGroup,
     gender,
     seekingGender,
@@ -69,6 +73,12 @@ export async function handleJoin(socket, io, redis, payload) {
           // Вернём кандидата обратно в его очередь
           await redis.lpush(queueKey, candidateRaw);
           continue;
+        }
+
+        // Найден кандидат
+        if (await isIgnored(redis, socket.data.anonClientId, candidate.anonClientId)) {
+        // Эти двое друг друга игнорят, пропускаем!
+        return; // Или continue; если будет цикл (у тебя сейчас один кандидат)
         }
 
         // --- Есть совпадение! Матчим:

@@ -1,7 +1,19 @@
 import { useState, useEffect } from "react"
 import { io } from "socket.io-client"
 
-const socket = io("http://localhost:3001") // Подключение к backend-сокету
+function getAnonClientId() {
+  return document.cookie
+    .split('; ')
+    .find(row => row.startsWith('anonClientId='))
+    ?.split('=')[1];
+}
+
+const socket = io("http://localhost:3001", {
+  query: {
+    anonClientId: getAnonClientId(),
+  }
+}) // Подключение к backend-сокету + получение AnonClientId
+
 
 function saveChatAsHtml(chat, mySocketId) {
   const html =
@@ -17,15 +29,6 @@ function saveChatAsHtml(chat, mySocketId) {
   link.click()
 }
 
-function getClientId() {
-  let id = localStorage.getItem('anonClientId');
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem('anonClientId', id);
-  }
-  return id;
-}
-const clientId = getClientId();
 
 function App() {
   // 🧠 Выбор пользователя
@@ -224,7 +227,19 @@ function App() {
                 <>
                   <button style={{...buttonStyle, background: "#f44"}} onClick={handleEndChat}>
                     Завершить чат
+                    </button>
+                    
+                  <button
+                      onClick={() => {
+                      socket.emit('ignoreUser', { roomId: connectedRoom });
+                      // Локально завершаем чат и через 1 сек. ищем нового:
+                      setConnectedRoom(null);
+                      setTimeout(() => handleSearch(), 1000);
+                                    }}
+>
+                      🚫 Игнорировать на 1 час
                   </button>
+                    
                   <div style={{display: "flex", marginBottom: 16}}>
                     <input
                       type="text"

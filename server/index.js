@@ -7,6 +7,38 @@ import cors from 'cors'
 import { handleJoin } from './matchmaking.js'
 import { config } from './config.js'
 
+import cookieParser from "cookie-parser";
+import { v4 as uuidv4 } from "uuid";
+
+import { ignoreUser } from './redisIgnore.js';
+
+// Подключаем парсер cookie (Express middleware для работы с cookie)
+app.use(cookieParser());
+
+/**
+ * Middleware для установки анонимного идентификатора пользователя (anonClientId) в cookie.
+ * 
+ * - Проверяет, есть ли у клиента cookie с anonClientId.
+ * - Если нет — генерирует новый UUID и сохраняет его в cookie с большим сроком жизни.
+ * - anonClientId используется для анонимного трекинга пользователя (например, для игнора и бана).
+ */
+app.use((req, res, next) => {
+  // Если в cookie нет anonClientId, генерируем и устанавливаем
+  if (!req.cookies.anonClientId) {
+    const anonClientId = uuidv4();
+    res.cookie('anonClientId', anonClientId, {
+      httpOnly: false,                         // false — cookie доступна на клиенте через JS (если true — безопасней, но фронт не увидит)
+      sameSite: 'lax',                         // Lax — защита от CSRF, но работает из большинства сценариев
+      maxAge: 1000 * 3600 * 24 * 365,          // Cookie живёт 1 год (в миллисекундах)
+      secure: process.env.NODE_ENV === 'production', // Secure только для HTTPS в проде
+    });
+    // Сразу добавляем anonClientId в req.cookies для дальнейшей логики запроса
+    req.cookies.anonClientId = anonClientId;
+  }
+  // Переходим к следующему middleware/роуту
+  next();
+});
+
 // Redis клиент
 const redis = new Redis({
   host: process.env.REDIS_HOST || 'redis',
@@ -33,6 +65,8 @@ const joinedCount = {};
 // Когда клиент подключается через socket.io
 io.on('connection', (socket) => {
   console.log(`🔌 Клиент подключился: ${socket.id}`)
+  socket.data.anonClientId = socket.handshake.query.anonClientId;
+
 
   // Клиент отправляет 'join' — хочет искать собеседника
   socket.on('join', async (payload) => {
@@ -56,6 +90,25 @@ io.on('connection', (socket) => {
       from: socket.id, // просто передаём идентификатор отправителя
     })
   })
+
+// Кнопка "Игнорировать" на клиенте будет вызывать это событие
+  socket.on('ignoreUser', async ({ roomId }) => {
+    const session = await redis.hgetall(`session:${roomId}`);
+    const userA = socket.data.anonClientId;
+    let userB = null;
+    if (session.userA && session.userA !== socket.id) userB = session.userA;
+    if (session.userB && session.userB !== socket.id) userB = session.userB;
+    if (!userA || !userB) return;
+
+    await ignoreUser(redis, userA, userB);
+
+    // Завершить чат для обоих (как в endChat)
+    if (session.userA) io.to(session.userA).emit('chatEnded');
+    if (session.userB) io.to(session.userB).emit('chatEnded');
+    await redis.del(`session:${roomId}`);
+    socket.leave(roomId);
+  })
+
 
   //Обработка подключения к комнате
   socket.on('joinRoomAck', ({ roomId }) => {
