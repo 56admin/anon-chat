@@ -1,18 +1,12 @@
 import { useState, useEffect } from "react"
 import { io } from "socket.io-client"
 
-function getAnonClientId() {
-  return document.cookie
-    .split('; ')
-    .find(row => row.startsWith('anonClientId='))
-    ?.split('=')[1];
-}
+
 
 const socket = io("http://localhost:3001", {
-  query: {
-    anonClientId: getAnonClientId(),
-  }
-}) // Подключение к backend-сокету + получение AnonClientId
+  withCredentials: true //
+});
+// Подключение к backend-сокету + получение AnonClientId
 
 
 function saveChatAsHtml(chat, mySocketId) {
@@ -33,9 +27,9 @@ function saveChatAsHtml(chat, mySocketId) {
 function App() {
   // 🧠 Выбор пользователя
   const [gender, setGender] = useState("m")
-  const [ageGroup, setAgeGroup] = useState("18-25")
+  const [ageGroup, setAgeGroup] = useState("19-25")
   const [seekingGender, setSeekingGender] = useState("f")
-  const [seekingAgeGroups, setSeekingAgeGroups] = useState(["18-25"]);
+  const [seekingAgeGroups, setSeekingAgeGroups] = useState(["19-25"]);
 
   // 🔁 Комната и сообщения
   const [connectedRoom, setConnectedRoom] = useState(null)
@@ -156,10 +150,10 @@ function App() {
           </FormRow>
           <FormRow label="Ваш возраст:">
             <select value={ageGroup} onChange={e => setAgeGroup(e.target.value)} style={inputStyle}>
-              <option value="18+">18+</option>
-              <option value="18-25">18–25</option>
-              <option value="25-35">25–35</option>
-              <option value="35+">35+</option>
+              <option value="18">18</option>
+              <option value="19-25">19–25</option>
+              <option value="26-35">26–35</option>
+              <option value="36+">35+</option>
             </select>
           </FormRow>
           <FormRow label="Ищу пол:">
@@ -170,7 +164,7 @@ function App() {
           </FormRow>
           <FormRow label="Ищу возраст:">
             <div style={{display: "flex", flexWrap: "wrap", gap: "8px 18px"}}>
-              {["18+", "18-25", "25-35", "35+"].map(val => (
+              {["18", "19-25", "26-35", "36+"].map(val => (
                 <label key={val} style={{
                   userSelect: "none",
                   fontSize: 15,

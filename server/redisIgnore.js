@@ -29,7 +29,9 @@ export async function ignoreUser(redis, idA, idB) {
  * @returns {boolean}        - true (1), если есть игнор, иначе false (0)
  */
 export async function isIgnored(redis, idA, idB) {
-  const [id1, id2] = [idA, idB].sort();
-  const key = `chat:ignore:${id1}:${id2}`;
-  return await redis.exists(key);
-}
+    const [id1, id2] = [idA, idB].sort();
+    const key = `chat:ignore:${id1}:${id2}`;
+    const exists = await redis.exists(key);
+    console.log(`🔍 Проверка игнора: ${id1} и ${id2} → exists=${exists}`);
+    return exists;
+  }

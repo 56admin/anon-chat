@@ -9,6 +9,7 @@ import { config } from './config.js'
 
 import cookieParser from "cookie-parser";
 import { v4 as uuidv4 } from "uuid";
+import { serialize, parse } from 'cookie';
 
 import { ignoreUser } from './redisIgnore.js';
 
@@ -29,13 +30,11 @@ app.use((req, res, next) => {
   if (!req.cookies.anonClientId) {
     const anonClientId = uuidv4();
     res.cookie('anonClientId', anonClientId, {
-      httpOnly: false,                         // false — cookie доступна на клиенте через JS (если true — безопасней, но фронт не увидит)
+      httpOnly: true,                         // false — cookie доступна на клиенте через JS (если true — безопасней, но фронт не увидит)
       sameSite: 'lax',                         // Lax — защита от CSRF, но работает из большинства сценариев
       maxAge: 1000 * 3600 * 24 * 365,          // Cookie живёт 1 год (в миллисекундах)
-      secure: process.env.NODE_ENV === 'production', // Secure только для HTTPS в проде
+      //secure: process.env.NODE_ENV === 'production', // Secure только для HTTPS в проде
     });
-    // Сразу добавляем anonClientId в req.cookies для дальнейшей логики запроса
-    req.cookies.anonClientId = anonClientId;
   }
   // Переходим к следующему middleware/роуту
   next();
@@ -51,23 +50,50 @@ const redis = new Redis({
 const server = http.createServer(app)
 const io = new Server(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+    origin: "http://localhost:3000", // или домен в продакшене
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 })
 
+io.engine.on('headers', (headers, req) => {
+  const cookies = req.headers.cookie ? parse(req.headers.cookie) : {};
+  if (!cookies.anonClientId) {
+    const newId = uuidv4();
+    headers['set-cookie'] = serialize('anonClientId', newId, {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 365,
+      secure: process.env.NODE_ENV === 'production'
+    });
+    req._anonClientId = newId;
+  }
+});
 
 const joinedCount = {};
 
 // Когда клиент подключается через socket.io
 io.on('connection', (socket) => {
+  let anonId = null;
+  if (socket.handshake.headers.cookie) {
+    const cookies = parse(socket.handshake.headers.cookie);
+    anonId = cookies.anonClientId;
+  }
+  // ВНИМАНИЕ: socket.handshake.request иногда undefined!
+  if (!anonId && socket.handshake.request && socket.handshake.request._anonClientId) {
+    anonId = socket.handshake.request._anonClientId;
+  }
+  socket.data.anonClientId = anonId || null;
   console.log(`🔌 Клиент подключился: ${socket.id}`)
-  socket.data.anonClientId = socket.handshake.query.anonClientId;
   console.log(`anonClientId для ${socket.id}: ${socket.data.anonClientId}`);
 
 
   // Клиент отправляет 'join' — хочет искать собеседника
   socket.on('join', async (payload) => {
+    if (!socket.data.anonClientId) {
+      socket.emit('error', { message: 'Ошибка идентификации. Перезагрузите страницу.' });
+      return;
+    }
     console.log(`📥 JOIN от ${socket.id}:`, payload)
 
     try {
@@ -90,22 +116,25 @@ io.on('connection', (socket) => {
   })
 
 // Кнопка "Игнорировать" на клиенте будет вызывать это событие
-  socket.on('ignoreUser', async ({ roomId }) => {
-    const session = await redis.hgetall(`session:${roomId}`);
-    const userA = socket.data.anonClientId;
-    let userB = null;
-    if (session.userA && session.userA !== socket.id) userB = session.userA;
-    if (session.userB && session.userB !== socket.id) userB = session.userB;
-    if (!userA || !userB) return;
+socket.on('ignoreUser', async ({ roomId }) => {
+  const session = await redis.hgetall(`session:${roomId}`);
+  const myAnonId = socket.data.anonClientId;
+  let partnerAnonId = null;
+  if (session.userA === socket.id && session.anonB) partnerAnonId = session.anonB;
+  if (session.userB === socket.id && session.anonA) partnerAnonId = session.anonA;
+  if (!myAnonId || !partnerAnonId) {
+      console.log(`❗️ Не удалось определить anonClientId для игнора:`, { myAnonId, partnerAnonId, session });
+      return;
+  }
+  await ignoreUser(redis, myAnonId, partnerAnonId);
+  console.log(`🛑 Игнорируем пару: ${myAnonId} и ${partnerAnonId}`);
 
-    await ignoreUser(redis, userA, userB);
-
-    // Завершить чат для обоих (как в endChat)
-    if (session.userA) io.to(session.userA).emit('chatEnded');
-    if (session.userB) io.to(session.userB).emit('chatEnded');
-    await redis.del(`session:${roomId}`);
-    socket.leave(roomId);
-  })
+  // Завершить чат для обоих
+  if (session.userA) io.to(session.userA).emit('chatEnded');
+  if (session.userB) io.to(session.userB).emit('chatEnded');
+  await redis.del(`session:${roomId}`);
+  socket.leave(roomId);
+});
 
 
   //Обработка подключения к комнате
