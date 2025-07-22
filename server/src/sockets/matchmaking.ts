@@ -128,8 +128,9 @@ export async function handleJoin(socket: Socket, io: Server, payload: JoinPayloa
         socket.join(roomId);
         socket.emit('joinRoom', { roomId });
         io.to(candidate.socketId).emit('joinRoom', { roomId });
-        socket.server.to(roomId).emit('roomReady');  // опционально: сигнал о готовности комнаты
+        io.to(roomId).emit('roomReady');  // опционально: сигнал о готовности комнаты
         console.log(`✅ Матч! Комната ${roomId}: ${myAnonId} <-> ${candidate.anonClientId}`);
+        await redisClient.lrem(myQueueKey, 0, myEntry);
         return;
       }
 
