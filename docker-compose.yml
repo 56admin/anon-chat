@@ -13,6 +13,7 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - MONGO_URL=mongodb://mongo:27017/anonchat
 
   redis:
     image: redis:7        # Используем официальный образ Redis (можно 7+)
@@ -20,6 +21,13 @@ services:
       - "6379:6379"       # Пробрасываем порт Redis (опционально — для дебага)
     volumes:
       - redis_data:/data  # Персистентное хранилище данных Redis
+
+  mongo:
+    image: mongo:6
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
   
   client:
     build:
@@ -36,3 +44,4 @@ services:
 
 volumes:
   redis_data:              # Объявляем volume Redis (данные будут сохраняться между перезапусками)
+  mongo_data:

@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+      "target": "ES2020",                    // Компилируем в ES2020 (совместимо с Node 20)
+      "module": "CommonJS",                  // Используем CommonJS-модули (Node по умолчанию)
+      "moduleResolution": "Node",           
+      "outDir": "dist",                      // Компилированные файлы появятся в папке dist
+      "rootDir": "src",                     
+      "strict": true,                        // Включаем строгий режим типизации
+      "esModuleInterop": true,               // Корректный импорт CommonJS-модулей (например, cookie-parser)
+      "skipLibCheck": true,                  // Пропускаем проверку типовых файлов зависимостей
+      "forceConsistentCasingInFileNames": true
+    }
+  }
+  
