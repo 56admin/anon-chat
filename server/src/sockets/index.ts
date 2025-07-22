@@ -33,8 +33,9 @@ export function registerSocketHandlers(io: Server) {
       anonId = cookies.anonClientId || null;
     }
     // Если при веб-сокет хэндшейке мы установили новый anonClientId, он будет доступен здесь
-    if (!anonId && socket.handshake.request && (socket.handshake.request as any)._anonClientId) {
-      anonId = (socket.handshake.request as any)._anonClientId;
+    const handshakeAny = socket.handshake as any;
+    if (!anonId && handshakeAny.request && handshakeAny.request._anonClientId) {
+        anonId = handshakeAny.request._anonClientId;
     }
     socket.data.anonClientId = anonId;
     console.log(`🔌 Новый клиент подключился: socketId=${socket.id}, anonClientId=${socket.data.anonClientId}`);
