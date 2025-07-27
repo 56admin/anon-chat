@@ -19,9 +19,16 @@ interface JoinPayload {
  * Добавляет пользователя в очередь и пытается подобрать ему пару.
  */
 export async function handleJoin(socket: Socket, io: Server, payload: JoinPayload) {
-    const { ageGroup, gender, seekingGender, seekingAgeGroups, isAdult = false, tag } = payload;
+    const {
+        ageGroup = "",
+        gender = "",
+        seekingGender = "",
+        seekingAgeGroups = [],
+        isAdult = false,
+        tag
+      } = payload;
     const myAnonId = socket.data.anonClientId;
-    const trimmedTag = tag?.trim();
+    const trimmedTag = String(tag).trim();
 
   // 1. Удаляем этого пользователя из всех очередей, где он мог остаться
   for (const g of ['m', 'f']) {
@@ -110,7 +117,7 @@ export async function handleJoin(socket: Socket, io: Server, payload: JoinPayloa
         anonA: myAnonId,
         anonB: candidate.anonClientId,
         isAdult,
-        tag: trimmedTag
+        tag: (tag || "").trim() || null
       });
   
       // подключение к комнате
@@ -152,7 +159,7 @@ export async function handleJoin(socket: Socket, io: Server, payload: JoinPayloa
   await redisClient.set(`status:${socket.id}`, 'active', 'EX', config.REDIS_STATUS_TTL_SECONDS);
 
   // 4. Перебираем очереди тех, кто подходит под условия поиска
-  for (const group of seekingAgeGroups) {
+  for (const group of (seekingAgeGroups || [])) {
     const queueKey = `queue:${seekingGender}:${group}`;
     let candidateRaw: string | null;
     const tempCandidates: string[] = [];

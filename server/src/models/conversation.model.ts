@@ -8,7 +8,7 @@ const ConversationSchema = new Schema({
 
   // ➕ Новые поля:
   isAdult: { type: Boolean, default: false },
-  tag: { type: String, default: null }
+  tag: { type: String, default: null, required: false }
 });
 
 export const Conversation = model('Conversation', ConversationSchema);
