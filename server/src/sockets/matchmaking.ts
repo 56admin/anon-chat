@@ -122,13 +122,27 @@ export async function handleJoin(socket: Socket, io: Server, payload: JoinPayloa
         await redisClient.set(`status:${candidate.socketId}`, 'matched', 'EX', config.REDIS_STATUS_TTL_SECONDS);
 
         // Сохраняем разговор в MongoDB (для истории и жалоб)
-        await Conversation.create({ _id: roomId, anonA: myAnonId, anonB: candidate.anonClientId });
+          await Conversation.create({
+              _id: roomId,
+              anonA: myAnonId,
+              anonB: candidate.anonClientId
+          });
 
         // Оповещаем клиентов о найденной паре и комнате
-        socket.join(roomId);
+          socket.join(roomId);
+        //Двух собеседников нужно добавлять в комнату
+        const candidateSocket = io.sockets.sockets.get(candidate.socketId);
+            if (candidateSocket) {
+        candidateSocket.join(roomId);
+        }
+          
+        // Теперь оба гарантированно получат joinRoom и roomReady
         socket.emit('joinRoom', { roomId });
-        io.to(candidate.socketId).emit('joinRoom', { roomId });
-        io.to(roomId).emit('roomReady');  // опционально: сигнал о готовности комнаты
+            if (candidateSocket) {
+            candidateSocket.emit('joinRoom', { roomId });
+          }
+        io.to(roomId).emit('roomReady');
+          
         console.log(`✅ Матч! Комната ${roomId}: ${myAnonId} <-> ${candidate.anonClientId}`);
         await redisClient.lrem(myQueueKey, 0, myEntry);
         return;

@@ -153,7 +153,7 @@ function App() {
               <option value="18">18</option>
               <option value="19-25">19–25</option>
               <option value="26-35">26–35</option>
-              <option value="36+">35+</option>
+              <option value="36+">36+</option>
             </select>
           </FormRow>
           <FormRow label="Ищу пол:">
