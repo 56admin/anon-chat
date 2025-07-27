@@ -30,6 +30,8 @@ function App() {
   const [ageGroup, setAgeGroup] = useState("19-25")
   const [seekingGender, setSeekingGender] = useState("f")
   const [seekingAgeGroups, setSeekingAgeGroups] = useState(["19-25"]);
+  const [adultMode, setAdultMode] = useState(false); // 🔞 Режим 18+
+  const [tag, setTag] = useState("");                // 🏷 Тег
 
   // 🔁 Комната и сообщения
   const [connectedRoom, setConnectedRoom] = useState(null)
@@ -92,14 +94,25 @@ function App() {
 
   // 🔍 Отправить запрос на поиск собеседника
   const handleSearch = () => {
-    setIsSearching(true)
-    socket.emit("join", {
-      gender,
-      ageGroup,
-      seekingGender,
-      seekingAgeGroups,
-    })
-  }
+    setIsSearching(true);
+    console.log("🔍 Ищем собеседника с параметрами:", { gender, ageGroup, seekingGender, seekingAgeGroups, adultMode, tag });
+  
+    if (tag.trim()) {
+      socket.emit("join", {
+        tag: tag.trim(),
+        isAdult: adultMode
+      });
+    } else {
+      socket.emit("join", {
+        gender,
+        ageGroup,
+        seekingGender,
+        seekingAgeGroups,
+        isAdult: adultMode
+      });
+    }
+  };
+  
 
   // 📤 Отправка сообщения
   const handleSendMessage = () => {
@@ -186,6 +199,35 @@ function App() {
               ))}
             </div>
           </FormRow>
+
+          <FormRow label="Режим 18+:">
+  <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <input
+      type="checkbox"
+      checked={adultMode}
+      onChange={() => {
+        if (!adultMode) {
+          const confirm18 = window.confirm("Подтверждая режим 18+, вы соглашаетесь с правилами и подтверждаете, что вам исполнилось 18 лет.");
+          if (!confirm18) return;
+        }
+        setAdultMode(prev => !prev);
+      }}
+    />
+    Включить
+  </label>
+</FormRow>
+
+<FormRow label="Тег (опционально):">
+  <input
+    type="text"
+    value={tag}
+    onChange={e => setTag(e.target.value)}
+    placeholder="Например: Москва, Игры"
+    style={inputStyle}
+  />
+</FormRow>
+
+
           <button
             style={buttonStyle}
             disabled={!seekingAgeGroups.length}

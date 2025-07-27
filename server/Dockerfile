@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Копируем package.json и tsconfig.json и устанавливаем зависимости
 COPY package*.json tsconfig.json ./
+#RUN npm install sharp
 RUN npm install
 
 # Копируем весь исходный код

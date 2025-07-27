@@ -6,19 +6,22 @@ import { isIgnored } from '../services/ignore.service';
 import { Conversation } from '../models/conversation.model';
 
 interface JoinPayload {
-  ageGroup: string;
-  gender: string;
-  seekingGender: string;
-  seekingAgeGroups: string[];
-}
+    ageGroup?: string;
+    gender?: string;
+    seekingGender?: string;
+    seekingAgeGroups?: string[];
+    isAdult?: boolean;
+    tag?: string;
+  }
 
 /**
  * Обработка запроса на поиск собеседника.
  * Добавляет пользователя в очередь и пытается подобрать ему пару.
  */
 export async function handleJoin(socket: Socket, io: Server, payload: JoinPayload) {
-  const { ageGroup, gender, seekingGender, seekingAgeGroups } = payload;
-  const myAnonId = socket.data.anonClientId;
+    const { ageGroup, gender, seekingGender, seekingAgeGroups, isAdult = false, tag } = payload;
+    const myAnonId = socket.data.anonClientId;
+    const trimmedTag = tag?.trim();
 
   // 1. Удаляем этого пользователя из всех очередей, где он мог остаться
   for (const g of ['m', 'f']) {
@@ -39,6 +42,99 @@ export async function handleJoin(socket: Socket, io: Server, payload: JoinPayloa
     }
   }
 
+// 🎯 Если передан тег — работаем через очередь по тегу
+  if (trimmedTag && trimmedTag.length > 0) {
+    const queueKey = `queue:tag:${trimmedTag}`;
+    const myEntry = JSON.stringify({
+      socketId: socket.id,
+      anonClientId: myAnonId,
+      isAdult
+    });
+  
+    await redisClient.lpush(queueKey, myEntry);
+    await redisClient.set(`status:${socket.id}`, 'active', 'EX', config.REDIS_STATUS_TTL_SECONDS);
+  
+    const tempBack: string[] = [];
+    let candidateRaw: string | null;
+  
+    while ((candidateRaw = await redisClient.rpop(queueKey)) !== null) {
+      let candidate;
+      try {
+        candidate = JSON.parse(candidateRaw);
+      } catch {
+        continue;
+      }
+  
+      if (candidate.socketId === socket.id) {
+        tempBack.push(candidateRaw);
+        continue;
+      }
+  
+      // Только если режим 18+ совпадает
+      if ((candidate.isAdult || false) !== isAdult) {
+        tempBack.push(candidateRaw);
+        continue;
+      }
+  
+      // Проверка что клиент онлайн
+      if (!io.sockets.sockets.has(candidate.socketId)) continue;
+  
+      const candidateStatus = await redisClient.get(`status:${candidate.socketId}`);
+      if (candidateStatus !== 'active') {
+        tempBack.push(candidateRaw);
+        continue;
+      }
+  
+      if (await isIgnored(myAnonId, candidate.anonClientId)) {
+        tempBack.push(candidateRaw);
+        continue;
+      }
+  
+      // ✅ Матч по тегу
+      const roomId = uuidv4();
+  
+      await redisClient.hset(`session:${roomId}`, {
+        userA: socket.id,
+        userB: candidate.socketId,
+        anonA: myAnonId,
+        anonB: candidate.anonClientId,
+        created: Date.now()
+      });
+  
+      await redisClient.set(`status:${socket.id}`, 'matched', 'EX', config.REDIS_STATUS_TTL_SECONDS);
+      await redisClient.set(`status:${candidate.socketId}`, 'matched', 'EX', config.REDIS_STATUS_TTL_SECONDS);
+  
+      // 💾 Mongo: сохраняем с тегом и флагом isAdult
+      await Conversation.create({
+        _id: roomId,
+        anonA: myAnonId,
+        anonB: candidate.anonClientId,
+        isAdult,
+        tag: trimmedTag
+      });
+  
+      // подключение к комнате
+      socket.join(roomId);
+      const candidateSocket = io.sockets.sockets.get(candidate.socketId);
+      if (candidateSocket) candidateSocket.join(roomId);
+  
+      socket.emit('joinRoom', { roomId });
+      if (candidateSocket) candidateSocket.emit('joinRoom', { roomId });
+      io.to(roomId).emit('roomReady');
+  
+      console.log(`🏷 Матч по тегу "${trimmedTag}" (${isAdult ? '18+' : 'обычный'}) → комната ${roomId}`);
+      return;
+    }
+  
+    // Возвращаем непросмотренных обратно
+    if (tempBack.length > 0) {
+      await redisClient.lpush(queueKey, ...tempBack.reverse());
+    }
+  
+    console.log(`⏳ ${socket.id} ожидает собеседника по тегу "${trimmedTag}"`);
+    return;
+  }
+    
   // 2. Добавляем себя в очередь в соответствии со своим полом и возрастной группой
   const myEntry = JSON.stringify({
     socketId: socket.id,

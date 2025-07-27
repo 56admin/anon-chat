@@ -9,6 +9,7 @@ import { ChatService } from '../services/chat.service';
 
 export function registerSocketHandlers(io: Server) {
   // При установлении нового HTTP соединения Socket.IO – присваиваем anonClientId через cookie (если нет)
+  // @ts-ignore
   io.engine.on('headers', (headers, req) => {
     const cookies = req.headers.cookie ? parse(req.headers.cookie) : {};
     if (!cookies.anonClientId) {
@@ -55,20 +56,40 @@ export function registerSocketHandlers(io: Server) {
       }
     });
 
-    // Когда клиент отправляет сообщение в чат
-    socket.on('message', async ({ roomId, text }) => {
-      console.log(`💬 Сообщение от ${socket.id} (anon=${socket.data.anonClientId}) в комнату ${roomId}: ${text}`);
-      // Отправляем сообщение всем участникам комнаты (включая отправителя)
-      io.to(roomId).emit('message', {
-        text,
-        from: socket.id
-      });
-      // Сохраняем сообщение в базе данных (история чата)
-      const senderAnonId = socket.data.anonClientId;
-      if (senderAnonId) {
-        await ChatService.addMessage(roomId, senderAnonId, text);
-      }
+  // Когда клиент отправляет сообщение (текст или изображение)
+  socket.on('message', async ({ roomId, text, imageId }) => {
+    const anonId = socket.data.anonClientId;
+    if (!anonId || !roomId) {
+      console.warn(`⚠️ message: отсутствует anonClientId или roomId (socket=${socket.id})`);
+      return;
+    }
+
+    console.log(`💬 message от ${socket.id} (anon=${anonId}) в комнату ${roomId}`, {
+      text: text || null,
+      imageId: imageId || null
     });
+
+    try {
+      // Сохраняем сообщение (текст или изображение)
+      await ChatService.addMessage({
+        conversationId: roomId,
+        senderAnonId: anonId,
+        text,
+        imageId
+      });
+
+      // Рассылаем сообщение всем в комнате
+      io.to(roomId).emit('message', {
+        from: anonId,
+        text,
+        imageId
+      });
+    } catch (err) {
+      console.error(`❌ Ошибка при обработке сообщения:`, err);
+      socket.emit('error', { message: 'Не удалось отправить сообщение' });
+    }
+  });
+    
 
     // Клиент нажал "Игнорировать пользователя"
     socket.on('ignoreUser', async ({ roomId }) => {
