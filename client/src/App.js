@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { io } from "socket.io-client"
 
 
@@ -41,6 +41,13 @@ function App() {
   const [isRoomReady, setIsRoomReady] = useState(false) // можно ли писать сообщения
   const [inChat, setInChat] = useState(false) //При “joinRoom” и “roomReady” ставить setInChat(true); при завершении чата — setInChat(false)
   const [chatEnded, setChatEnded] = useState(false)
+  const [showMore, setShowMore] = useState(false)
+  const [systemMessages, setSystemMessages] = useState([])
+  const addSystemMessage = (text) => {
+    setSystemMessages(prev => [...prev, { id: Date.now(), text }])
+  }
+  // ссылка на контейнер чата для автопрокрутки
+  const chatContainerRef = useRef(null)
 
   const handleFindNewPartner = () => {
     setConnectedRoom(null);
@@ -52,7 +59,12 @@ function App() {
   }; 
 
   const [isSearching, setIsSearching] = useState(false)
-
+   // автопрокрутка вниз при появлении новых сообщений/системных сообщений
+  useEffect(() => {
+    if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+      }
+    }, [chat, systemMessages])
 
   // 🔌 При подключении к комнате или получении сообщений
   useEffect(() => {
@@ -75,7 +87,7 @@ function App() {
     })
 
     socket.on("message", ({ text, from }) => {
-      setChat(prev => [...prev, { text, from }])
+      setChat(prev => [...prev, { text, from, timestamp: new Date() }])
     })
 
     socket.on("chatEnded", () => {
@@ -112,7 +124,6 @@ function App() {
       });
     }
   };
-  
 
   // 📤 Отправка сообщения
   const handleSendMessage = () => {
