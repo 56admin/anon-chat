@@ -146,3 +146,8 @@ code {
   margin-left: 6px;
   cursor: pointer;
 }
+.chat-image {
+  max-width: 200px;
+  border-radius: 8px;
+  margin-top: 4px;
+}
